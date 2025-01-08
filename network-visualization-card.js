@@ -1,3 +1,5 @@
+import { LitElement, html } from 'https://unpkg.com/lit-element@2.5.1/lit-element.js?module';
+
 // Load D3.js library
 if (!window.d3) {
   const script = document.createElement('script');
@@ -35,11 +37,51 @@ function initializeCard() {
       // Clear previous content
       this.content.innerHTML = '';
 
+      // Display title if show_title is true
+      if (config.show_title) {
+        const title = config.title || 'Network Visualization Card';
+        const titleElement = document.createElement('h1');
+        titleElement.style.margin = '16px';
+        titleElement.style.fontSize = '24px';
+        titleElement.style.fontWeight = 'bold';
+        titleElement.style.textAlign = 'left';
+        titleElement.textContent = title;
+        this.content.appendChild(titleElement);
+      }
+
       // Fetch the tracked device data
       const trackedDeviceEntity = hass.states[config.entity];
       if (!trackedDeviceEntity) {
         this.content.innerHTML = 'Error: Tracked device not found.';
         return;
+      }
+
+      // Display entity name if show_name is true
+      if (config.show_name) {
+        const entityName = config.name || trackedDeviceEntity.attributes.friendly_name || config.entity;
+        const nameElement = document.createElement('h2');
+        nameElement.style.margin = '8px 16px';
+        nameElement.style.fontSize = '20px';
+        nameElement.style.fontWeight = 'normal';
+        nameElement.style.textAlign = 'left';
+        nameElement.textContent = entityName;
+        this.content.appendChild(nameElement);
+      }
+
+      // Display zoom level if show_zoom is true
+      const zoomIndicator = document.createElement('div');
+      zoomIndicator.style.position = 'absolute';
+      zoomIndicator.style.top = '10px';
+      zoomIndicator.style.right = '10px';
+      zoomIndicator.style.backgroundColor = 'white';
+      zoomIndicator.style.padding = '5px';
+      zoomIndicator.style.border = '1px solid black';
+      zoomIndicator.style.borderRadius = '3px';
+      zoomIndicator.style.display = 'none';
+      this.content.appendChild(zoomIndicator);
+
+      if (config.show_zoom) {
+        zoomIndicator.style.display = 'block';
       }
 
       const trackedDevice = {
@@ -73,23 +115,35 @@ function initializeCard() {
         .attr('preserveAspectRatio', 'xMidYMid meet')
         .style('width', '100%')
         .style('height', '100%')
-        .call(d3.zoom().on("zoom", (event) => {
-          g.attr("transform", event.transform);
-        }))
-        .on("dblclick.zoom", null);
+        .style('border', '1px solid black'); // Add a border around the SVG
+
+      const g = svg.append("g");
+
+      // Define the zoom behavior
+      const zoom = d3.zoom()
+        .scaleExtent([0.5, 5]) // Adjust scale extent as needed
+        .on("zoom", (event) => {
+          this.zoomTransform = event.transform;
+          g.attr("transform", this.zoomTransform);
+          zoomIndicator.textContent = `Zoom: ${(this.zoomTransform.k * 100).toFixed(0)}%`;
+        });
+
+      // Apply the zoom behavior to the SVG
+      svg.call(zoom);
 
       const width = 900;
       const height = 600;
       const centerX = width / 2;
       const centerY = height / 2;
+      const initialTransform = d3.zoomIdentity.translate(centerX, centerY);
+      svg.call(zoom.transform, initialTransform);
+
       const minDistance = 60; // Increased minimum distance for better readability
       const maxSVGDistance = Math.min(width, height) / 2 - minDistance;
 
       const colorScale = d3.scaleThreshold()
         .domain([3, 15, 50, 100])
         .range(["lightgreen", "yellow", "orange", "red", "grey"]);
-
-      const g = svg.append("g");
 
       g.append("circle")
         .attr("cx", centerX)
@@ -162,10 +216,6 @@ function initializeCard() {
       }
     }
 
-    static getConfigElement() {
-      return document.createElement("network-visualization-card-editor");
-    }
-
     static getStubConfig() {
       return {
         entity: "sensor.tracked_device",
@@ -182,47 +232,4 @@ function initializeCard() {
   }
 
   customElements.define('network-visualization-card', NetworkVisualizationCard);
-
-  class NetworkVisualizationCardEditor extends HTMLElement {
-    setConfig(config) {
-      this._config = config;
-      this.innerHTML = `
-        <div>
-          <paper-input label="Entity" value="${config.entity}" id="entity"></paper-input>
-          <div id="nodes">
-            ${config.nodes.map((node, index) => `
-              <div>
-                <paper-input label="Node ${index + 1} Name" value="${node.name}" id="node_name_${index}"></paper-input>
-                <paper-input label="Node ${index + 1} Sensor Distance" value="${node.sensor_distance}" id="node_sensor_${index}"></paper-input>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `;
-
-      this.querySelectorAll('paper-input').forEach(input => {
-        input.addEventListener('change', () => this._valueChanged());
-      });
-    }
-
-    _valueChanged() {
-      const entity = this.querySelector('#entity').value;
-      const nodes = Array.from(this.querySelectorAll('#nodes div')).map((nodeDiv, index) => ({
-        name: nodeDiv.querySelector(`#node_name_${index}`).value,
-        sensor_distance: nodeDiv.querySelector(`#node_sensor_${index}`).value,
-      }));
-
-      this._config = { entity, nodes };
-
-      const event = new Event('config-changed', {
-        bubbles: true,
-        composed: true
-      });
-
-      event.detail = { config: this._config };
-      this.dispatchEvent(event);
-    }
-  }
-
-  customElements.define('network-visualization-card-editor', NetworkVisualizationCardEditor);
 }
