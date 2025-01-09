@@ -13,7 +13,6 @@ if (!window.d3) {
 } else {
   initializeCard();
 }
-
 function initializeCard() {
   class NetworkVisualizationCard extends HTMLElement {
     constructor() {
@@ -26,6 +25,9 @@ function initializeCard() {
       const root = this.shadowRoot;
 
       if (!root) return;
+
+      // Store the current zoom state
+      const currentTransform = this.zoomTransform;
 
       if (!this.content) {
         const card = document.createElement('ha-card');
@@ -48,7 +50,6 @@ function initializeCard() {
         titleElement.textContent = title;
         this.content.appendChild(titleElement);
       }
-
       // Fetch the tracked device data
       const trackedDeviceEntity = hass.states[config.entity];
       if (!trackedDeviceEntity) {
@@ -83,7 +84,6 @@ function initializeCard() {
       if (config.show_zoom) {
         zoomIndicator.style.display = 'block';
       }
-
       const trackedDevice = {
         name: trackedDeviceEntity.attributes.friendly_name || config.entity,
         distance: 0
@@ -118,7 +118,6 @@ function initializeCard() {
         .style('border', '1px solid black'); // Add a border around the SVG
 
       const g = svg.append("g");
-
       // Define the zoom behavior
       const zoom = d3.zoom()
         .scaleExtent([0.5, 5]) // Adjust scale extent as needed
@@ -133,11 +132,6 @@ function initializeCard() {
 
       const width = 900;
       const height = 600;
-      const centerX = width / 2;
-      const centerY = height / 2;
-      const initialTransform = d3.zoomIdentity.translate(centerX, centerY);
-      svg.call(zoom.transform, initialTransform);
-
       const minDistance = 60; // Increased minimum distance for better readability
       const maxSVGDistance = Math.min(width, height) / 2 - minDistance;
 
@@ -145,28 +139,41 @@ function initializeCard() {
         .domain([3, 15, 50, 100])
         .range(["lightgreen", "yellow", "orange", "red", "grey"]);
 
-      g.append("circle")
-        .attr("cx", centerX)
-        .attr("cy", centerY)
-        .attr("r", 10) // Reduced radius for node circles
-        .attr("fill", "lightblue");
+      // Calculate node positions based on angles
+      const angleStep = 360 / (nodes.length + 1); // Include the tracked device in angle calculations
 
-      const angleStep = 360 / nodes.length;
-
-      nodes.forEach((node, i) => {
+      // Calculate positions for all nodes, including the tracked device
+      const allNodes = [trackedDevice, ...nodes];
+      allNodes.forEach((node, i) => {
         const angle = angleStep * i;
         const radians = (Math.PI / 180) * angle;
-        const effectiveDistance = Math.max((node.distance / maxDistance) * maxSVGDistance, minDistance);
-        node.x = centerX + effectiveDistance * Math.cos(radians);
-        node.y = centerY + effectiveDistance * Math.sin(radians);
+        const effectiveDistance = i === 0 ? 0 : Math.max((node.distance / maxDistance) * maxSVGDistance, minDistance); // Tracked device is at the center
+        node.x = effectiveDistance * Math.cos(radians);
+        node.y = effectiveDistance * Math.sin(radians);
+      });
 
-        g.append("line")
-          .attr("x1", centerX)
-          .attr("y1", centerY)
-          .attr("x2", node.x)
-          .attr("y2", node.y)
-          .attr("stroke", "grey")
-          .attr("stroke-width", 2);
+      // Calculate bounding box
+      const xExtent = d3.extent(allNodes, node => node.x);
+      const yExtent = d3.extent(allNodes, node => node.y);
+      const centerX = (xExtent[0] + xExtent[1]) / 2;
+      const centerY = (yExtent[0] + yExtent[1]) / 2;
+
+      // Adjust positions to center the visualization
+      allNodes.forEach(node => {
+        node.x += width / 2 - centerX;
+        node.y += height / 2 - centerY;
+      });
+      allNodes.forEach((node, i) => {
+        // Draw lines from the tracked device to each node
+        if (i !== 0) {
+          g.append("line")
+            .attr("x1", allNodes[0].x)
+            .attr("y1", allNodes[0].y)
+            .attr("x2", node.x)
+            .attr("y2", node.y)
+            .attr("stroke", "grey")
+            .attr("stroke-width", 2);
+        }
 
         g.append("circle")
           .attr("cx", node.x)
@@ -175,14 +182,16 @@ function initializeCard() {
           .attr("fill", colorScale(node.distance));
 
         // Ensure text and distances are the top layer
-        g.append("text")
-          .attr("x", (centerX + node.x) / 2)
-          .attr("y", (centerY + node.y) / 2 - 10)
-          .attr("font-size", "14px") // Adjusted font size for readability
-          .attr("fill", "black")
-          .attr("text-anchor", "middle")
-          .text(`${node.distance}ft`)
-          .raise();
+        if (i !== 0) {
+          g.append("text")
+            .attr("x", (allNodes[0].x + node.x) / 2)
+            .attr("y", (allNodes[0].y + node.y) / 2 - 10)
+            .attr("font-size", "14px") // Adjusted font size for readability
+            .attr("fill", "black")
+            .attr("text-anchor", "middle")
+            .text(`${node.distance}ft`)
+            .raise();
+        }
 
         g.append("text")
           .attr("x", node.x)
@@ -207,6 +216,9 @@ function initializeCard() {
       }
 
       animatePulsingCircle();
+
+      // Reapply the stored zoom state
+      svg.call(zoom.transform, currentTransform);
     }
 
     setConfig(config) {
