@@ -6,21 +6,23 @@ The card can only be edited in the code editor, not the UI editor:
 
 ```
 type: custom:network-visualization-card
-show_title: true #or false
-title: My Visualization Card #optional, defaults to Network Visualization Card if not defined
-entity: device_tracker.josh_pixel_watch_bermuda_tracker #required tracked device, router, etc
-show_name: true #or false
-name: Pixel Watch #optional, defaults to defined entity's friendly name
-show_zoom: true #or false
-nodes: #at least one node required
-  - name: btproxy1
+show_title: true
+title: Network Visualization Card
+entity: device_tracker.josh_pixel_watch_bermuda_tracker
+entity_name: Me or My Watch
+show_subtitle: true
+subtitle: Pixel Watch
+nodes:
+  - name: Breezeway
     sensor_distance: sensor.josh_pixel_watch_distance_to_btproxy1
-  - name: btproxy2
+  - name: Basement
     sensor_distance: sensor.josh_pixel_watch_distance_to_btproxy2
-  - name: bleclient1
+  - name: Upstairs
     sensor_distance: sensor.josh_pixel_watch_distance_to_bleclient1
-  - name: trainble
+  - name: Living Room
     sensor_distance: sensor.josh_pixel_watch_distance_to_trainble
-  - name: HA BT
+  - name: The Hole
     sensor_distance: sensor.josh_pixel_watch_distance_to_hci0_e4_5f_01_ae_c1_e4
+
 ```
+
