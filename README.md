@@ -2,9 +2,30 @@
 a network visualization card for Home Assistant
 
 
-The card can only be edited in the code editor, not the UI editor.
+# V0.01
+> The card can only be edited in the code editor, not the UI editor.
 
+Created to help visualize a device being tracked by [Bermuda BLE Trilateration](https://github.com/agittins/bermuda) this card should conceivably create a star topology visualization of any device and node combination. It does not currently represent mesh networks. 
 
+| Name | Type | Default | Options | Description |
+|------|------|---------|---------|-------------|
+| `type` | string | required | `custom:network-visualization-card` | card type |
+| `entity` | string | required | any HA entity | represents a tracked device, will be center of visualization |
+| `entity_name` | string | optional | any value | if blank or undeclared will default to entity's `friendly_name`|
+| `header` | object | required | | required to be declared |
+| `show_title`| boolean | optional | `true` or `false` | defaults to false if excluded |
+| `title` | string | conditionally required | any value | required if `show_title` is true |Upstairs
+| `show_subtitle`| boolean | optional | `true` or `false` | defaults to false if excluded |
+| `subtitle` | string | conditionally required | any value | required if `show_subtitle` is true |
+| `map` | object | required | | kinda the whole point of the card |
+| `nodes` | object | required | | mapping block |
+| `sensor_distance` | string | required | any sensor with a numeric value for a state | use `-` for the mapping sequence |
+| `name` | string | optional | any value | defaults to friendly name of sensor if excluded or left blank |
+| `footer` | object | required | | required to be declared |
+| `show_info_entities` | boolean | optional | `true` or `false` | defaults to false if excluded |
+| `info_entities` | object | conditionally required | | required if `show_info_entities` is true |
+| `entity` | string | required | any entity | will display any entity's state |
+| `name` | string | optional | any value | if excluded or left blank, entity's friendly name will be displayed |
 ```
 type: custom:network-visualization-card
 entity: device_tracker.josh_pixel_watch_bermuda_tracker
@@ -16,16 +37,16 @@ header:
   subtitle: Pixel Watch
 map:  
   nodes:
-    - name: Breezeway
-      sensor_distance: sensor.josh_pixel_watch_distance_to_btproxy1
-    - name: Basement
-      sensor_distance: sensor.josh_pixel_watch_distance_to_btproxy2
-    - name: Upstairs
-      sensor_distance: sensor.josh_pixel_watch_distance_to_bleclient1
-    - name: Living Room
-      sensor_distance: sensor.josh_pixel_watch_distance_to_trainble
-    - name: The Hole
-      sensor_distance: sensor.josh_pixel_watch_distance_to_hci0_e4_5f_01_ae_c1_e4
+    - sensor_distance: sensor.josh_pixel_watch_distance_to_btproxy1
+      name: Breezeway
+    - sensor_distance: sensor.josh_pixel_watch_distance_to_btproxy2
+      name: Basement
+    - sensor_distance: sensor.josh_pixel_watch_distance_to_bleclient1
+      name: Upstairs
+    - sensor_distance: sensor.josh_pixel_watch_distance_to_trainble
+      name: Living Room
+    - sensor_distance: sensor.josh_pixel_watch_distance_to_hci0_e4_5f_01_ae_c1_e4
+      name: The Hole
 footer:
   show_info_entities: true
   info_entities:
