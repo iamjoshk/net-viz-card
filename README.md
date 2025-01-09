@@ -45,7 +45,7 @@ map:
       name: Upstairs
     - sensor_distance: sensor.josh_pixel_watch_distance_to_trainble
       name: Living Room
-    - sensor_distance: sensor.josh_pixel_watch_distance_to_hci0_e4_5f_01_ae_c1_e4
+    - sensor_distance: sensor.josh_pixel_watch_distance_to_habt
       name: The Hole
 footer:
   show_info_entities: true
