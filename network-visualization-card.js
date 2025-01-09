@@ -43,10 +43,18 @@ function initializeCard() {
           flex-direction: column;
         }
         .card-header, .card-footer {
-          padding: 16px;
+          padding: 2px; /* Add 2px padding around the elements */
         }
-        .card-footer {
-          border-top: 1px solid #ccc;
+        .card-header h2, .card-header h3 {
+          margin: 0;
+          padding: 2px; /* Add 2px padding */
+          line-height: var(--paper-font-title_-_line-height); /* Use HA's default line height */
+        }
+        .card-header h2 {
+          font-size: var(--ha-card-header-font-size, 24px); /* Use HA's default or 24px */
+        }
+        .card-header h3 {
+          font-size: var(--ha-card-subheader-font-size, 16px); /* Use HA's default or 16px */
         }
         #content {
           flex: 1;
@@ -139,8 +147,8 @@ function initializeCard() {
       const config = this._config.header;
       return html`
         <div class="card-header">
-          ${config.show_title ? html`<h1>${config.title}</h1>` : ''}
-          ${config.show_subtitle ? html`<h2>${config.subtitle}</h2>` : ''}
+          ${config.show_title ? html`<h2>${config.title}</h2>` : ''}
+          ${config.show_subtitle ? html`<h3>${config.subtitle}</h3>` : ''}
         </div>
       `;
     }
@@ -297,7 +305,6 @@ function initializeCard() {
           g.append("text")
             .attr("x", (width / 2 + node.x) / 2)
             .attr("y", (height / 2 + node.y) / 2 - 10)
-            .attr("font-size", "14px") // Adjusted font size for readability
             .attr("fill", "black")
             .attr("text-anchor", "middle")
             .text(`${node.distance}ft`)
@@ -315,7 +322,6 @@ function initializeCard() {
         g.append("text")
           .attr("x", node.x)
           .attr("y", node.y - 20) // Adjusted position for readability
-          .attr("font-size", "14px") // Adjusted font size for readability
           .attr("fill", "black")
           .attr("text-anchor", "middle")
           .text(node.name)
