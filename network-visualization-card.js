@@ -38,7 +38,6 @@ function initializeCard() {
 
       // Clear previous content
       this.content.innerHTML = '';
-
       // Display title if show_title is true
       if (config.show_title) {
         const title = config.title || 'Network Visualization Card';
@@ -50,23 +49,24 @@ function initializeCard() {
         titleElement.textContent = title;
         this.content.appendChild(titleElement);
       }
+
       // Fetch the tracked device data
       const trackedDeviceEntity = hass.states[config.entity];
       if (!trackedDeviceEntity) {
         this.content.innerHTML = 'Error: Tracked device not found.';
         return;
       }
-
-      // Display entity name if show_name is true
-      if (config.show_name) {
-        const entityName = config.name || trackedDeviceEntity.attributes.friendly_name || config.entity;
-        const nameElement = document.createElement('h2');
-        nameElement.style.margin = '8px 16px';
-        nameElement.style.fontSize = '20px';
-        nameElement.style.fontWeight = 'normal';
-        nameElement.style.textAlign = 'left';
-        nameElement.textContent = entityName;
-        this.content.appendChild(nameElement);
+      // Display entity name if show_subtitle is true
+      const entityName = config.entity_name || trackedDeviceEntity.attributes.friendly_name || config.entity;
+      if (config.show_subtitle) {
+        const subtitle = config.subtitle || entityName;
+        const subtitleElement = document.createElement('h2');
+        subtitleElement.style.margin = '8px 16px';
+        subtitleElement.style.fontSize = '20px';
+        subtitleElement.style.fontWeight = 'normal';
+        subtitleElement.style.textAlign = 'left';
+        subtitleElement.textContent = subtitle;
+        this.content.appendChild(subtitleElement);
       }
 
       // Display zoom level if show_zoom is true
@@ -85,7 +85,7 @@ function initializeCard() {
         zoomIndicator.style.display = 'block';
       }
       const trackedDevice = {
-        name: trackedDeviceEntity.attributes.friendly_name || config.entity,
+        name: entityName,
         distance: 0
       };
 
