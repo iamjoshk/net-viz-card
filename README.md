@@ -1,11 +1,17 @@
 # net-viz-card
 a network visualization card for Home Assistant
 
-
-# V0.01
 > The card can only be edited in the code editor, not the UI editor.
 
-Created to help visualize a device being tracked by [Bermuda BLE Trilateration](https://github.com/agittins/bermuda) this card should conceivably create a star topology visualization of any device and node combination. It does not currently represent mesh networks. 
+Created to help visualize a device being tracked by [Bermuda BLE Trilateration](https://github.com/agittins/bermuda) this card should conceivably create a star topology visualization of any device and node combination. It does not currently represent mesh networks.
+
+# V0.01
+Initial release
+
+# V0.02
+> The card can only be edited in the code editor, not the UI editor.
+
+Updated with options to show/hide the current zoom, set a default zoom, show/hide the bounding box, and show/hide all nodes.
 
 | Name | Type | Default | Options | Description |
 |------|------|---------|---------|-------------|
@@ -14,10 +20,14 @@ Created to help visualize a device being tracked by [Bermuda BLE Trilateration](
 | `entity_name` | string | optional | any value | if blank or undeclared will default to entity's `friendly_name`|
 | `header` | object | required | | required to be declared |
 | `show_title`| boolean | optional | `true` or `false` | defaults to false if excluded |
-| `title` | string | conditionally required | any value | required if `show_title` is true |Upstairs
+| `title` | string | conditionally required | any value | required if `show_title` is true |
 | `show_subtitle`| boolean | optional | `true` or `false` | defaults to false if excluded |
 | `subtitle` | string | conditionally required | any value | required if `show_subtitle` is true |
+| `show_zoom` | boolean | optional | `true` or `false` | show/hide the current zoom level of the map |
+| `default_zoom` | number | optional | zoom level, default is `100` |
 | `map` | object | required | | kinda the whole point of the card |
+| `show_all_nodes` | boolean | optional | `true` or `false` | defaults to true, show/hide nodes with invalid distances |
+| `show_bounding_box` | boolean | optional | `true` or `false` | defaults to true, show/hide the bounding box for the map |
 | `nodes` | object | required | | mapping block |
 | `sensor_distance` | string | required | any sensor with a numeric value for a state | use `-` for the mapping sequence |
 | `name` | string | optional | any value | defaults to friendly name of sensor if excluded or left blank |
@@ -35,7 +45,11 @@ header:
   title: Network Visualization Card
   show_subtitle: true
   subtitle: Pixel Watch
-map:  
+  show_zoom: true
+  default_zoom: 100
+map:
+  show_all_nodes: true
+  show_bounding_box: true  
   nodes:
     - sensor_distance: sensor.josh_pixel_watch_distance_to_btproxy1
       name: Breezeway
