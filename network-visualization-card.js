@@ -61,6 +61,14 @@ class NetworkVisualizationCard extends LitElement {
       throw new Error('Please define map.nodes');
     }
 
+    // Ensure show_all_nodes and show_bounding_box are set (default to true)
+    if (config.map.show_all_nodes === undefined) {
+      config.map.show_all_nodes = true;
+    }
+    if (config.map.show_bounding_box === undefined) {
+      config.map.show_bounding_box = true;
+    }
+
     // Ensure default_zoom is provided in the header
     if (!config.header) {
       config.header = {};
@@ -110,8 +118,10 @@ class NetworkVisualizationCard extends LitElement {
       map: {
         nodes: [
           { name: "Node 1", sensor_distance: "sensor.node_1_distance" },
-          { name: "Node 2", sensor_distance: "sensor.node_2_distance" },
-        ]
+          { name: "Node 2", sensor_distance: "sensor.node_2_distance" }
+        ],
+        show_all_nodes: true,
+        show_bounding_box: true
       },
       header: {
         show_title: true,
@@ -184,8 +194,8 @@ class NetworkVisualizationCard extends LitElement {
       .info-entity {
         margin: 4px 0;
         display: flex;
-        justify-content: space-between;
         align-items: center;
+        text-align: left; /* Align text to the left */
       }
       .info-entity strong {
         margin-right: 8px;
@@ -276,7 +286,7 @@ class NetworkVisualizationCard extends LitElement {
 
     // Dynamically size the SVG container to fill the card
     const svg = d3.select(cardContent).append('svg')
-      .attr('viewBox', '0 0 900 600')
+      .attr('viewBox', '0 0 400 400')
       .attr('preserveAspectRatio', 'xMidYMid meet')
       .style('width', '100%')
       .style('height', '100%')
@@ -325,6 +335,19 @@ class NetworkVisualizationCard extends LitElement {
       distance: 0
     };
 
+    const width = 400;
+    const height = 400;
+
+    // Draw the friendly name or entity_name of the tracked device
+    g.append("text")
+      .attr("x", width / 2)
+      .attr("y", height / 2 - 20)
+      .attr("fill", "black")
+      .attr("text-anchor", "middle")
+      .style("font-size", "12px")
+      .text(trackedDevice.name)
+      .raise();
+
     // Fetch the node data and render visualization
     const nodes = config.map.nodes.map(nodeConfig => {
       const stateObj = this.hass.states[nodeConfig.sensor_distance];
@@ -334,8 +357,6 @@ class NetworkVisualizationCard extends LitElement {
       };
     });
 
-    const width = 900;
-    const height = 600;
     const minDistance = 60;
     const maxSVGDistance = Math.min(width, height) / 2 - minDistance;
     const invalidDistance = maxSVGDistance * 0.65;
@@ -371,6 +392,18 @@ class NetworkVisualizationCard extends LitElement {
       node.y += height / 2 - centerY;
     });
 
+    // Optionally draw the bounding box
+    if (config.map.show_bounding_box) {
+      g.append("rect")
+        .attr("x", xExtent[0] + width / 2 - centerX - 30)
+        .attr("y", yExtent[0] + height / 2 - centerY - 30)
+        .attr("width", xExtent[1] - xExtent[0] + 80)
+        .attr("height", yExtent[1] - yExtent[0] + 80)
+        .attr("fill", "none")
+        .attr("stroke", "red")
+        .attr("stroke-width", 1);
+    }
+
     // Draw the tracked device at the center
     g.append("circle")
       .attr("cx", width / 2)
@@ -382,37 +415,41 @@ class NetworkVisualizationCard extends LitElement {
     allNodes.forEach((node, i) => {
       if (i === 0) return; // Skip the tracked device itself
 
-      if (node.distance !== null) {
-        g.append("line")
-          .attr("x1", width / 2)
-          .attr("y1", height / 2)
-          .attr("x2", node.x)
-          .attr("y2", node.y)
-          .attr("stroke", "grey")
-          .attr("stroke-width", 2);
+      if (node.distance !== null || config.map.show_all_nodes) {
+        if (node.distance !== null) {
+          g.append("line")
+            .attr("x1", width / 2)
+            .attr("y1", height / 2)
+            .attr("x2", node.x)
+            .attr("y2", node.y)
+            .attr("stroke", "grey")
+            .attr("stroke-width", 2);
+
+          g.append("text")
+            .attr("x", (width / 2 + node.x) / 2)
+            .attr("y", (height / 2 + node.y) / 2 - 10)
+            .attr("fill", "black")
+            .attr("text-anchor", "middle")
+            .style("font-size", "12px")
+            .text(`${node.distance}ft`)
+            .raise();
+        }
+
+        g.append("circle")
+          .attr("cx", node.x)
+          .attr("cy", node.y)
+          .attr("r", 10)
+          .attr("fill", node.distance !== null ? colorScale(node.distance) : "lightgrey");
 
         g.append("text")
-          .attr("x", (width / 2 + node.x) / 2)
-          .attr("y", (height / 2 + node.y) / 2 - 10)
+          .attr("x", node.x)
+          .attr("y", node.y - 20)
           .attr("fill", "black")
           .attr("text-anchor", "middle")
-          .text(`${node.distance}ft`)
+          .style("font-size", "12px")
+          .text(node.name)
           .raise();
       }
-
-      g.append("circle")
-        .attr("cx", node.x)
-        .attr("cy", node.y)
-        .attr("r", 10)
-        .attr("fill", node.distance !== null ? colorScale(node.distance) : "lightgrey");
-
-      g.append("text")
-        .attr("x", node.x)
-        .attr("y", node.y - 20)
-        .attr("fill", "black")
-        .attr("text-anchor", "middle")
-        .text(node.name)
-        .raise();
     });
   }
 }
