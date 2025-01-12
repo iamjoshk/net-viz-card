@@ -1,9 +1,9 @@
 // Register the card with Home Assistant
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: "network-visualization-card",
-  name: "Network Visualization Card",
-  description: "A card that visualizes network nodes and their distances",
+  type: "device-trilateration-card",
+  name: "Device Trilateration Card",
+  description: "A card that visualizes network nodes and their distances using trilateration",
   preview: true
 });
 
@@ -30,7 +30,7 @@ const loadD3 = async () => {
 
 loadD3();
 
-class NetworkVisualizationCard extends LitElement {
+class DeviceTrilaterationCard extends LitElement {
   static get properties() {
     return {
       hass: { type: Object },
@@ -69,6 +69,9 @@ class NetworkVisualizationCard extends LitElement {
     }
     if (config.map.show_bounding_box === undefined) {
       config.map.show_bounding_box = true;
+    }
+    if (config.map.show_trilateration === undefined) {
+      config.map.show_trilateration = true;
     }
 
     if (!config.header) {
@@ -121,7 +124,8 @@ class NetworkVisualizationCard extends LitElement {
         ],
         map_size: "3 3",
         show_all_nodes: true,
-        show_bounding_box: true
+        show_bounding_box: true,
+        show_trilateration: true
       },
       header: {
         show_title: true,
@@ -338,7 +342,7 @@ class NetworkVisualizationCard extends LitElement {
       const stateObj = this.hass.states[nodeConfig.sensor_distance];
       return {
         name: nodeConfig.name || stateObj?.attributes.friendly_name || nodeConfig.sensor_distance,
-        distance: stateObj && !isNaN(parseFloat(stateObj.state)) && stateObj.state !== 'unknown' ? parseFloat(stateObj.state) : null,
+        distance: stateObj && !isNaN(parseFloat(stateObj.state)) && stateObj.state !== 'unknown' && stateObj.state !== 'unavailable' ? parseFloat(stateObj.state) : null,
         x: (index % cols) * nodeWidth + nodeWidth / 2,
         y: Math.floor(index / cols) * nodeHeight + nodeHeight / 2
       };
@@ -346,7 +350,24 @@ class NetworkVisualizationCard extends LitElement {
 
     const circleRadius = 7.5; // 25% smaller than original 10
 
-    nodes.forEach((node) => {
+    // Draw bounding box if enabled
+    if (config.map.show_bounding_box) {
+      g.append("rect")
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("width", width)
+        .attr("height", height)
+        .attr("fill", "none")
+        .attr("stroke", "#ccc")
+        .attr("stroke-width", "1");
+    }
+
+    // Filter nodes based on show_all_nodes setting
+    const visibleNodes = config.map.show_all_nodes ?
+      nodes :
+      nodes.filter(node => node.distance !== null);
+
+    visibleNodes.forEach((node) => {
       g.append("circle")
         .attr("cx", node.x)
         .attr("cy", node.y)
@@ -372,87 +393,105 @@ class NetworkVisualizationCard extends LitElement {
         .raise();
     });
 
-    const closestNodes = nodes.filter(node => node.distance !== null)
-                              .sort((a, b) => a.distance - b.distance)
-                              .slice(0, 3);
+    const closestNodes = visibleNodes.filter(node => node.distance !== null)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 3);
 
     // Start of trilateration logic
     if (closestNodes.length === 3) {
-      const [node1, node2, node3] = closestNodes;
-      
-      const A = 2 * (node2.x - node1.x);
-      const B = 2 * (node2.y - node1.y);
-      const C = 2 * (node3.x - node1.x);
-      const D = 2 * (node3.y - node1.y);
-      
-      const E = node1.distance ** 2 - node2.distance ** 2 - node1.x ** 2 + node2.x ** 2 - node1.y ** 2 + node2.y ** 2;
-      const F = node1.distance ** 2 - node3.distance ** 2 - node1.x ** 2 + node3.x ** 2 - node1.y ** 2 + node3.y ** 2;
-      
-      const x = (E * D - B * F) / (A * D - B * C);
-      const y = (A * F - E * C) / (A * D - B * C);
+        const [node1, node2, node3] = closestNodes;
 
-      g.append("circle")
-        .attr("cx", x)
-        .attr("cy", y)
-        .attr("r", circleRadius)
-        .attr("fill", "blue");
+        // Calculate weights based on distances (inverse of distance)
+        const weight1 = 1 / node1.distance;
+        const weight2 = 1 / node2.distance;
+        const weight3 = 1 / node3.distance;
 
-      g.append("text")
-        .attr("x", x)
-        .attr("y", y + 15)
-        .attr("fill", "black")
-        .attr("text-anchor", "middle")
-        .style("font-size", "10pt")
-        .text(trackedDevice.name)
-        .raise();
+        // Normalize weights
+        const totalWeight = weight1 + weight2 + weight3;
+        const w1 = weight1 / totalWeight;
+        const w2 = weight2 / totalWeight;
+        const w3 = weight3 / totalWeight;
+
+        // Calculate the position based on weights
+        const x = (node1.x * w1) + (node2.x * w2) + (node3.x * w3);
+        const y = (node1.y * w1) + (node2.y * w2) + (node3.y * w3);
+
+        // Draw trilateration triangle if enabled
+        if (config.map.show_trilateration) {
+            g.append("polygon")
+                .attr("points", `${node1.x},${node1.y} ${node2.x},${node2.y} ${node3.x},${node3.y}`)
+                .attr("fill", "none")
+                .attr("stroke", "green")
+                .attr("stroke-width", "1");
+        }
+
+        g.append("circle")
+            .attr("cx", x)
+            .attr("cy", y)
+            .attr("r", circleRadius)
+            .attr("fill", "blue");
+
+        g.append("text")
+            .attr("x", x)
+            .attr("y", y + 15)
+            .attr("fill", "black")
+            .attr("text-anchor", "middle")
+            .style("font-size", "10pt")
+            .text(trackedDevice.name)
+            .raise();
+
     } else if (closestNodes.length === 2) {
-      const [node1, node2] = closestNodes;
-      const totalDistance = node1.distance + node2.distance;
-      const x = (node1.x * node1.distance + node2.x * node2.distance) / totalDistance;
-      const y = (node1.y * node1.distance + node2.y * node2.distance) / totalDistance;
+        const [node1, node2] = closestNodes;
+        const dx = node2.x - node1.x;
+        const dy = node2.y - node1.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const ratio = node1.distance / (node1.distance + node2.distance);
+        const x = node1.x + dx * ratio;
+        const y = node1.y + dy * ratio;
 
-      g.append("circle")
-        .attr("cx", x)
-        .attr("cy", y)
-        .attr("r", circleRadius)
-        .attr("fill", "blue");
+        g.append("circle")
+            .attr("cx", x)
+            .attr("cy", y)
+            .attr("r", circleRadius)
+            .attr("fill", "blue");
 
-      g.append("text")
-        .attr("x", x)
-        .attr("y", y + 15)
-        .attr("fill", "black")
-        .attr("text-anchor", "middle")
-        .style("font-size", "10pt")
-        .text(trackedDevice.name)
-        .raise();
+        g.append("text")
+            .attr("x", x)
+            .attr("y", y + 15)
+            .attr("fill", "black")
+            .attr("text-anchor", "middle")
+            .style("font-size", "10pt")
+            .text(trackedDevice.name)
+            .raise();
+
     } else if (closestNodes.length === 1) {
-      const [node1] = closestNodes;
-      const x = node1.x + circleRadius * 2;
-      const y = node1.y;
+        const [node1] = closestNodes;
+        const x = node1.x + node1.distance;
+        const y = node1.y;
 
-      g.append("circle")
-        .attr("cx", x)
-        .attr("cy", y)
-        .attr("r", circleRadius)
-        .attr("fill", "blue");
+        g.append("circle")
+            .attr("cx", x)
+            .attr("cy", y)
+            .attr("r", circleRadius)
+            .attr("fill", "blue");
 
-      g.append("text")
-        .attr("x", x)
-        .attr("y", y + 15)
-        .attr("fill", "black")
-        .attr("text-anchor", "middle")
-        .style("font-size", "10pt")
-        .text(trackedDevice.name)
-        .raise();
+        g.append("text")
+            .attr("x", x)
+            .attr("y", y + 15)
+            .attr("fill", "black")
+            .attr("text-anchor", "middle")
+            .style("font-size", "10pt")
+            .text(trackedDevice.name)
+            .raise();
     } else {
-      g.append("text")
-        .attr("x", width / 2)
-        .attr("y", height / 2)
-        .attr("fill", "red")
-        .attr("text-anchor", "middle")
-        .style("font-size", "10pt")
-        .text('No valid distances found')
-        .raise();
+        g.append("text")
+            .attr("x", width / 2)
+            .attr("y", height / 2)
+            .attr("fill", "red")
+            .attr("text-anchor", "middle")
+            .style("font-size", "10pt")
+            .text('No valid distances found')
+            .raise();
     }
     // End of trilateration logic
   }
@@ -461,7 +500,7 @@ class NetworkVisualizationCard extends LitElement {
 // Only define the custom element once d3 is loaded
 const defineCustomElement = () => {
   if (d3Loaded) {
-    customElements.define('network-visualization-card', NetworkVisualizationCard);
+    customElements.define('device-trilateration-card', DeviceTrilaterationCard);
   } else {
     setTimeout(defineCustomElement, 100);
   }
