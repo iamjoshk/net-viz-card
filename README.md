@@ -5,7 +5,7 @@ a network visualization card for Home Assistant
 
 Created to help visualize a device being tracked by [Bermuda BLE Trilateration](https://github.com/agittins/bermuda) this card should conceivably create a star topology visualization of any device and node combination. It does not currently represent mesh networks.
 
-# V0.01
+### V0.01
 Initial release
 
 # V0.02
