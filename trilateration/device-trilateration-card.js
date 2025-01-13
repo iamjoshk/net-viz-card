@@ -144,7 +144,9 @@ class DeviceTrilaterationCard extends LitElement {
     };
   }
 
-  static get styles() {
+// End of Part 1
+
+static get styles() {
     return css`
       :host {
         display: block;
@@ -155,6 +157,8 @@ class DeviceTrilaterationCard extends LitElement {
         height: 100%;
         display: flex;
         flex-direction: column;
+        background: var(--ha-card-background, var(--card-background-color, white));
+        color: var(--primary-text-color);
       }
       .card-header {
         padding: 2px;
@@ -165,15 +169,51 @@ class DeviceTrilaterationCard extends LitElement {
       .header-text {
         flex: 1;
       }
+      .zoom-container {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 2px;  // Reduced from 4px
+            }
+            .zoom-controls {
+              display: flex;
+              align-items: center;
+              gap: 4px;  // Reduced from 8px
+            }
       .zoom-level {
         padding: 4px 8px;
         font-size: 10pt;
         color: var(--secondary-text-color);
+        text-align: center;
+      }
+      .zoom-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .zoom-button {
+        cursor: pointer;
+        padding: 4px 8px;
+        border: none;
+        border-radius: 4px;
+        background: var(--primary-color);
+        color: var(--text-primary-color);
+        font-size: 14px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 24px;
+        height: 24px;
+      }
+      .zoom-button:hover {
+        background: var(--primary-color-light, var(--primary-color));
       }
       .card-header h2, .card-header h3 {
         margin: 0;
         padding: 2px;
         line-height: var(--paper-font-title_-_line-height);
+        color: var(--primary-text-color);
       }
       .card-header h2 {
         font-size: var(--ha-card-header-font-size, 24px);
@@ -193,19 +233,21 @@ class DeviceTrilaterationCard extends LitElement {
       }
       .card-footer {
         padding: 8px;
-        border-top: 1px solid var(--divider-color, #e8e8e8);
+        border-top: 1px solid var(--divider-color);
+        background: var(--ha-card-background, var(--card-background-color, white));
       }
       .info-entity {
         margin: 4px 0;
         display: flex;
         align-items: center;
         text-align: left;
+        color: var(--primary-text-color);
       }
       .info-entity strong {
         margin-right: 8px;
       }
       .error-message {
-        color: red;
+        color: var(--error-color, red);
         padding: 16px;
       }
     `;
@@ -230,8 +272,14 @@ class DeviceTrilaterationCard extends LitElement {
                 html`<h3>${this._config.header.subtitle}</h3>` : ''}
             </div>
             ${this._config.header.show_zoom ? html`
-              <div class="zoom-level">
-                Zoom: ${Math.round(this._zoomState.k * 100)}%
+              <div class="zoom-container">
+                <div class="zoom-level">
+                  Zoom: ${Math.round(this._zoomState.k * 100)}%
+                </div>
+                <div class="zoom-controls">
+                  <button class="zoom-button" @click="${this._handleZoomOut}" title="Zoom Out">-</button>
+                  <button class="zoom-button" @click="${this._handleZoomIn}" title="Zoom In">+</button>
+                </div>
               </div>
             ` : ''}
           </div>
@@ -270,12 +318,44 @@ class DeviceTrilaterationCard extends LitElement {
     }
   }
 
+// End of Part 2
+  _handleZoomIn() {
+    const newScale = Math.min(this._zoomState.k * 1.2, 5);
+    this._updateZoom(newScale);
+  }
+
+  _handleZoomOut() {
+    const newScale = Math.max(this._zoomState.k / 1.2, 0.5);
+    this._updateZoom(newScale);
+  }
+
+  _updateZoom(newScale) {
+    const svg = this.shadowRoot.querySelector('svg');
+    if (!svg) return;
+
+    const g = d3.select(svg).select('g');
+    
+    this._zoomState = {
+      x: this._zoomState.x,
+      y: this._zoomState.y,
+      k: newScale
+    };
+
+    g.attr('transform', `translate(${this._zoomState.x}, ${this._zoomState.y}) scale(${newScale})`);
+    this.requestUpdate();
+  }
+
   _renderCard() {
     if (!window.d3 || !this._config) return;
     
     const config = this._config;
     const root = this.shadowRoot.getElementById('content');
     if (!root) return;
+
+    // Get the computed text color for dark mode compatibility
+    const computedStyle = getComputedStyle(this);
+    const textColor = computedStyle.getPropertyValue('--primary-text-color').trim();
+    const nodeColor = computedStyle.getPropertyValue('--secondary-text-color').trim();
 
     while (root.firstChild) {
       root.removeChild(root.firstChild);
@@ -302,22 +382,22 @@ class DeviceTrilaterationCard extends LitElement {
       .translate(this._zoomState.x, this._zoomState.y)
       .scale(this._zoomState.k !== 1 ? this._zoomState.k : (this._config.header?.default_zoom || 100) / 100);
 
-    this._zoomState.k = this._zoomState.k !== 1 ? this._config.header?.default_zoom || 100 / 100 : this._zoomState.k;
-
     const zoom = d3.zoom()
       .scaleExtent([0.5, 5])
+      .filter(event => {
+        return !event.type.includes('wheel') && !event.type.includes('pinch');
+      })
       .on("zoom", (event) => {
         this._zoomState = {
           x: event.transform.x,
           y: event.transform.y,
-          k: event.transform.k
+          k: this._zoomState.k
         };
-        g.attr("transform", event.transform);
+        g.attr("transform", `translate(${event.transform.x}, ${event.transform.y}) scale(${this._zoomState.k})`);
         this.requestUpdate();
       });
 
     svg.call(zoom);
-
     svg.call(zoom.transform, initialZoom);
 
     const trackedDeviceEntity = this.hass.states[config.entity];
@@ -344,13 +424,13 @@ class DeviceTrilaterationCard extends LitElement {
         name: nodeConfig.name || stateObj?.attributes.friendly_name || nodeConfig.sensor_distance,
         distance: stateObj && !isNaN(parseFloat(stateObj.state)) && stateObj.state !== 'unknown' && stateObj.state !== 'unavailable' ? parseFloat(stateObj.state) : null,
         x: (index % cols) * nodeWidth + nodeWidth / 2,
-        y: Math.floor(index / cols) * nodeHeight + nodeHeight / 2
+        y: Math.floor(index / cols) * nodeHeight + nodeHeight / 2,
+        sensor_distance: nodeConfig.sensor_distance
       };
     });
 
-    const circleRadius = 7.5; // 25% smaller than original 10
+    const circleRadius = 7.5;
 
-    // Draw bounding box if enabled
     if (config.map.show_bounding_box) {
       g.append("rect")
         .attr("x", 0)
@@ -358,33 +438,31 @@ class DeviceTrilaterationCard extends LitElement {
         .attr("width", width)
         .attr("height", height)
         .attr("fill", "none")
-        .attr("stroke", "#ccc")
+        .attr("stroke", "var(--divider-color)")
         .attr("stroke-width", "1");
     }
 
-    // Filter nodes based on show_all_nodes setting
     const visibleNodes = config.map.show_all_nodes ?
       nodes :
       nodes.filter(node => node.distance !== null);
 
-    visibleNodes.forEach((nodeConfig, index) => {
-      const node = {
-        ...nodeConfig,
-        x: (index % cols) * nodeWidth + nodeWidth / 2,
-        y: Math.floor(index / cols) * nodeHeight + nodeHeight / 2
-      };
-
+    visibleNodes.forEach((node) => {
       g.append("circle")
         .attr("cx", node.x)
         .attr("cy", node.y)
         .attr("r", circleRadius)
-        .attr("fill", "lightgrey")
-        .on("click", () => this._showMoreInfo(nodeConfig.sensor_distance));
+        .attr("fill", nodeColor)
+        .style("cursor", "pointer")
+        .on("click", () => {
+          if (node.sensor_distance) {
+            this._showMoreInfo(node.sensor_distance);
+          }
+        });
 
       g.append("text")
         .attr("x", node.x)
-        .attr("y", node.y - 22)  // Move higher above the node
-        .attr("fill", "black")
+        .attr("y", node.y - 22)
+        .attr("fill", textColor)
         .attr("text-anchor", "middle")
         .style("font-size", "10pt")
         .text(node.name)
@@ -392,8 +470,8 @@ class DeviceTrilaterationCard extends LitElement {
 
       g.append("text")
         .attr("x", node.x)
-        .attr("y", node.y - 35)  // Move higher above the node and increase space between lines
-        .attr("fill", "black")
+        .attr("y", node.y - 35)
+        .attr("fill", textColor)
         .attr("text-anchor", "middle")
         .style("font-size", "10pt")
         .text(`${node.distance !== null ? `${node.distance}ft` : 'unknown'}`)
@@ -404,31 +482,23 @@ class DeviceTrilaterationCard extends LitElement {
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 3);
 
-    // Start of trilateration logic
     if (closestNodes.length === 3) {
         const [node1, node2, node3] = closestNodes;
-
-        // Calculate weights based on distances (inverse of distance)
         const weight1 = 1 / node1.distance;
         const weight2 = 1 / node2.distance;
         const weight3 = 1 / node3.distance;
-
-        // Normalize weights
         const totalWeight = weight1 + weight2 + weight3;
         const w1 = weight1 / totalWeight;
         const w2 = weight2 / totalWeight;
         const w3 = weight3 / totalWeight;
-
-        // Calculate the position based on weights
         const x = (node1.x * w1) + (node2.x * w2) + (node3.x * w3);
         const y = (node1.y * w1) + (node2.y * w2) + (node3.y * w3);
 
-        // Draw trilateration triangle if enabled
         if (config.map.show_trilateration) {
             g.append("polygon")
                 .attr("points", `${node1.x},${node1.y} ${node2.x},${node2.y} ${node3.x},${node3.y}`)
                 .attr("fill", "none")
-                .attr("stroke", "green")
+                .attr("stroke", "var(--success-color)")
                 .attr("stroke-width", "1");
         }
 
@@ -436,13 +506,14 @@ class DeviceTrilaterationCard extends LitElement {
             .attr("cx", x)
             .attr("cy", y)
             .attr("r", circleRadius)
-            .attr("fill", "blue")
+            .attr("fill", "var(--primary-color)")
+            .style("cursor", "pointer")
             .on("click", () => this._showMoreInfo(config.entity));
 
         g.append("text")
             .attr("x", x)
-            .attr("y", y + 25)  // Lower below the circle more
-            .attr("fill", "black")
+            .attr("y", y + 25)
+            .attr("fill", textColor)
             .attr("text-anchor", "middle")
             .style("font-size", "10pt")
             .text(trackedDevice.name)
@@ -461,13 +532,14 @@ class DeviceTrilaterationCard extends LitElement {
             .attr("cx", x)
             .attr("cy", y)
             .attr("r", circleRadius)
-            .attr("fill", "blue")
+            .attr("fill", "var(--primary-color)")
+            .style("cursor", "pointer")
             .on("click", () => this._showMoreInfo(config.entity));
 
         g.append("text")
             .attr("x", x)
-            .attr("y", y + 25)  // Lower below the circle more
-            .attr("fill", "black")
+            .attr("y", y + 25)
+            .attr("fill", textColor)
             .attr("text-anchor", "middle")
             .style("font-size", "10pt")
             .text(trackedDevice.name)
@@ -482,13 +554,14 @@ class DeviceTrilaterationCard extends LitElement {
             .attr("cx", x)
             .attr("cy", y)
             .attr("r", circleRadius)
-            .attr("fill", "blue")
+            .attr("fill", "var(--primary-color)")
+            .style("cursor", "pointer")
             .on("click", () => this._showMoreInfo(config.entity));
 
         g.append("text")
             .attr("x", x)
-            .attr("y", y + 25)  // Lower below the circle more
-            .attr("fill", "black")
+            .attr("y", y + 25)
+            .attr("fill", textColor)
             .attr("text-anchor", "middle")
             .style("font-size", "10pt")
             .text(trackedDevice.name)
@@ -497,33 +570,24 @@ class DeviceTrilaterationCard extends LitElement {
         g.append("text")
             .attr("x", width / 2)
             .attr("y", height / 2)
-            .attr("fill", "red")
+            .attr("fill", textColor)
             .attr("text-anchor", "middle")
             .style("font-size", "10pt")
             .text('No valid distances found')
             .raise();
     }
-    // End of trilateration logic
   }
 
   _showMoreInfo(entityId) {
-    const event = new Event('hass-more-info', {
+    if (!entityId) return;
+    
+    const event = new CustomEvent('hass-more-info', {
       bubbles: true,
-      cancelable: false,
       composed: true,
+      detail: { entityId }
     });
-    event.detail = { entityId };
     this.dispatchEvent(event);
   }
 }
 
-// Only define the custom element once d3 is loaded
-const defineCustomElement = () => {
-  if (d3Loaded) {
-    customElements.define('device-trilateration-card', DeviceTrilaterationCard);
-  } else {
-    setTimeout(defineCustomElement, 100);
-  }
-};
-
-defineCustomElement();
+customElements.define('device-trilateration-card', DeviceTrilaterationCard);
