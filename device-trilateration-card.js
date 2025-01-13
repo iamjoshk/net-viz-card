@@ -242,12 +242,12 @@ class DeviceTrilaterationCard extends LitElement {
             ${this._config.footer.info_entities.map(entityConfig => {
               const stateObj = this.hass.states[entityConfig.entity];
               if (!stateObj) {
-                return html`<div class="info-entity">
+                return html`<div class="info-entity" @click="${() => this._showMoreInfo(entityConfig.entity)}">
                   Error: ${entityConfig.entity} not found
                 </div>`;
               }
               return html`
-                <div class="info-entity">
+                <div class="info-entity" @click="${() => this._showMoreInfo(entityConfig.entity)}">
                   <strong>${entityConfig.name || stateObj.attributes.friendly_name || entityConfig.entity}:</strong>
                   ${stateObj.state}${stateObj.attributes.unit_of_measurement ? ` ${stateObj.attributes.unit_of_measurement}` : ''}
                 </div>
@@ -367,16 +367,23 @@ class DeviceTrilaterationCard extends LitElement {
       nodes :
       nodes.filter(node => node.distance !== null);
 
-    visibleNodes.forEach((node) => {
+    visibleNodes.forEach((nodeConfig, index) => {
+      const node = {
+        ...nodeConfig,
+        x: (index % cols) * nodeWidth + nodeWidth / 2,
+        y: Math.floor(index / cols) * nodeHeight + nodeHeight / 2
+      };
+
       g.append("circle")
         .attr("cx", node.x)
         .attr("cy", node.y)
         .attr("r", circleRadius)
-        .attr("fill", "lightgrey");
+        .attr("fill", "lightgrey")
+        .on("click", () => this._showMoreInfo(nodeConfig.sensor_distance));
 
       g.append("text")
         .attr("x", node.x)
-        .attr("y", node.y - 15)
+        .attr("y", node.y - 22)  // Move higher above the node
         .attr("fill", "black")
         .attr("text-anchor", "middle")
         .style("font-size", "10pt")
@@ -385,7 +392,7 @@ class DeviceTrilaterationCard extends LitElement {
 
       g.append("text")
         .attr("x", node.x)
-        .attr("y", node.y - 5)
+        .attr("y", node.y - 35)  // Move higher above the node and increase space between lines
         .attr("fill", "black")
         .attr("text-anchor", "middle")
         .style("font-size", "10pt")
@@ -429,11 +436,12 @@ class DeviceTrilaterationCard extends LitElement {
             .attr("cx", x)
             .attr("cy", y)
             .attr("r", circleRadius)
-            .attr("fill", "blue");
+            .attr("fill", "blue")
+            .on("click", () => this._showMoreInfo(config.entity));
 
         g.append("text")
             .attr("x", x)
-            .attr("y", y + 15)
+            .attr("y", y + 25)  // Lower below the circle more
             .attr("fill", "black")
             .attr("text-anchor", "middle")
             .style("font-size", "10pt")
@@ -453,11 +461,12 @@ class DeviceTrilaterationCard extends LitElement {
             .attr("cx", x)
             .attr("cy", y)
             .attr("r", circleRadius)
-            .attr("fill", "blue");
+            .attr("fill", "blue")
+            .on("click", () => this._showMoreInfo(config.entity));
 
         g.append("text")
             .attr("x", x)
-            .attr("y", y + 15)
+            .attr("y", y + 25)  // Lower below the circle more
             .attr("fill", "black")
             .attr("text-anchor", "middle")
             .style("font-size", "10pt")
@@ -473,11 +482,12 @@ class DeviceTrilaterationCard extends LitElement {
             .attr("cx", x)
             .attr("cy", y)
             .attr("r", circleRadius)
-            .attr("fill", "blue");
+            .attr("fill", "blue")
+            .on("click", () => this._showMoreInfo(config.entity));
 
         g.append("text")
             .attr("x", x)
-            .attr("y", y + 15)
+            .attr("y", y + 25)  // Lower below the circle more
             .attr("fill", "black")
             .attr("text-anchor", "middle")
             .style("font-size", "10pt")
@@ -494,6 +504,16 @@ class DeviceTrilaterationCard extends LitElement {
             .raise();
     }
     // End of trilateration logic
+  }
+
+  _showMoreInfo(entityId) {
+    const event = new Event('hass-more-info', {
+      bubbles: true,
+      cancelable: false,
+      composed: true,
+    });
+    event.detail = { entityId };
+    this.dispatchEvent(event);
   }
 }
 
